@@ -17,13 +17,26 @@ import { deepMerge } from './serviceHelpers';
 import { Account, ChromeStorageObject, CurrentAccountObject, DeprecatedStorage } from './types/chromeStorage.types';
 
 export class ChromeStorageService {
-  storage: Partial<ChromeStorageObject> | undefined;
+  storage: Partial<ChromeStorageObject> | undefined = {};
 
   private set = async (obj: Partial<ChromeStorageObject>): Promise<void> => {
     return new Promise<void>((resolve, reject) => {
+      if (process.env.NODE_ENV === 'development' && (!chrome?.storage?.local || !chrome?.runtime)) {
+        console.warn('Chrome storage API not available in development mode, using mock storage');
+        this.storage = { ...this.storage, ...obj };
+        resolve();
+        return;
+      }
+
       chrome.storage.local.set(obj, async () => {
         if (chrome.runtime.lastError) {
-          reject(chrome.runtime.lastError);
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('Chrome storage error:', chrome.runtime.lastError);
+            this.storage = { ...this.storage, ...obj };
+            resolve();
+          } else {
+            reject(chrome.runtime.lastError);
+          }
         } else {
           await this.getAndSetStorage();
           resolve();
@@ -34,9 +47,39 @@ export class ChromeStorageService {
 
   private get = async (keyOrKeys: string | string[] | null): Promise<Partial<ChromeStorageObject>> => {
     return new Promise<Partial<ChromeStorageObject>>((resolve, reject) => {
+      if (process.env.NODE_ENV === 'development' && (!chrome?.storage?.local || !chrome?.runtime)) {
+        console.warn('Chrome storage API not available in development mode, using mock storage');
+        if (!this.storage) {
+          this.storage = {};
+        }
+        if (keyOrKeys === null) {
+          resolve(this.storage);
+        } else {
+          const result: Partial<ChromeStorageObject> = {};
+          if (keyOrKeys === null) {
+            resolve(this.storage || {});
+            return;
+          }
+
+          const keys = Array.isArray(keyOrKeys) ? keyOrKeys : [keyOrKeys];
+          keys.forEach((key) => {
+            if (this.storage && typeof key === 'string' && key in this.storage) {
+              (result as any)[key] = (this.storage as any)[key];
+            }
+          });
+          resolve(result);
+        }
+        return;
+      }
+
       chrome.storage.local.get(keyOrKeys, (result: Partial<ChromeStorageObject>) => {
         if (chrome.runtime.lastError) {
-          reject(chrome.runtime.lastError);
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('Chrome storage error:', chrome.runtime.lastError);
+            resolve({});
+          } else {
+            reject(chrome.runtime.lastError);
+          }
         } else {
           resolve(result);
         }

@@ -6,8 +6,14 @@ import ProgressBar from '@ramonak/react-progress-bar';
 import { YoursIcon } from './YoursIcon';
 
 const spin = keyframes`
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% { 
+    transform: rotate(0deg);
+    will-change: transform;
+  }
+  100% { 
+    transform: rotate(360deg);
+    will-change: transform;
+  }
 `;
 
 export const LoaderContainer = styled.div<WhiteLabelTheme>`
@@ -30,6 +36,9 @@ const ProgressBarContainer = styled.div`
 `;
 
 export const Loader = styled.div<WhiteLabelTheme>`
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  perspective: 1000;
   border: 0.5rem solid ${({ theme }) => theme.color.global.contrast + '50'};
   border-top: 0.5rem solid ${({ theme }) => theme.color.component.pageLoaderSpinner};
   border-radius: 50%;
@@ -45,7 +54,9 @@ export type PageLoaderProps = {
   barProgress?: number;
 };
 
-export const PageLoader = (props: PageLoaderProps) => {
+import React from 'react';
+
+export const PageLoader = React.memo((props: PageLoaderProps) => {
   const { message, theme, showProgressBar = false, barProgress = 0 } = props;
   return (
     <LoaderContainer theme={theme}>
@@ -65,4 +76,4 @@ export const PageLoader = (props: PageLoaderProps) => {
       </Show>
     </LoaderContainer>
   );
-};
+});

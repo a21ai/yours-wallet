@@ -1,22 +1,26 @@
-import { InputHTMLAttributes } from 'react';
+import React, { InputHTMLAttributes } from 'react';
 import styled, { css, keyframes } from 'styled-components';
 import { Theme } from '../theme.types';
 
 const $shakeAnimation = keyframes`
   10%, 90% {
-    transform: translate3d(-1px, 0, 0);
+    transform: translateX(-1px);
+    will-change: transform;
   }
   
   20%, 80% {
-    transform: translate3d(2px, 0, 0);
+    transform: translateX(2px);
+    will-change: transform;
   }
 
   30%, 50%, 70% {
-    transform: translate3d(-4px, 0, 0);
+    transform: translateX(-4px);
+    will-change: transform;
   }
 
   40%, 60% {
-    transform: translate3d(4px, 0, 0);
+    transform: translateX(4px);
+    will-change: transform;
   }
 `;
 
@@ -59,7 +63,7 @@ export type InputProps = InputHTMLAttributes<HTMLInputElement> & {
   shake?: string;
 };
 
-export const Input = (props: InputProps) => {
+export const Input = React.memo((props: InputProps) => {
   const { shake = 'false', theme, ...allProps } = props;
 
   const preventScroll = (e: React.WheelEvent<HTMLInputElement>) => {
@@ -71,4 +75,4 @@ export const Input = (props: InputProps) => {
   };
 
   return <TheInput {...allProps} theme={theme} onWheel={preventScroll} $shake={shake} />;
-};
+});
