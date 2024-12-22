@@ -12,6 +12,8 @@
 /build
 /build-extension
 /extension
+/extensions/*
+*.zip
 
 # misc
 .DS_Store
