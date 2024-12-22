@@ -20,9 +20,6 @@ module.exports = function override(config) {
     stream: require.resolve('stream-browserify'),
     buffer: require.resolve('buffer'),
     process: require.resolve('process'),
-    http: require.resolve('stream-http'),
-    https: require.resolve('https-browserify'),
-    zlib: require.resolve('browserify-zlib'),
     fs: false,
     os: false,
   };
