@@ -1,4 +1,5 @@
 import { styled } from 'styled-components';
+import React from 'react';
 import { useTheme } from '../hooks/useTheme';
 import { HeaderText } from './Reusable';
 import { useState } from 'react';
@@ -41,7 +42,7 @@ export type AccountRowProps = {
   onClick: () => void;
 };
 
-export const AccountRow = (props: AccountRowProps) => {
+const AccountRowComponent = (props: AccountRowProps) => {
   const { name, icon, onClick, jsxElement } = props;
   const { theme } = useTheme();
   const [containerColor, setContainerColor] = useState(theme.color.global.row);
@@ -61,3 +62,5 @@ export const AccountRow = (props: AccountRowProps) => {
     </Container>
   );
 };
+
+export const AccountRow = React.memo(AccountRowComponent);

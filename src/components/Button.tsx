@@ -36,7 +36,8 @@ const Primary = styled.button<WhiteLabelTheme>`
   }
 
   &:hover {
-    transform: scale(1.02);
+    filter: brightness(1.1);
+    will-change: filter;
   }
 `;
 
@@ -97,7 +98,9 @@ export type ButtonProps = {
   style?: React.CSSProperties;
 };
 
-export const Button = (props: ButtonProps) => {
+import React from 'react';
+
+export const Button = React.memo((props: ButtonProps) => {
   const { label, type, onClick, disabled, theme, isSubmit, style } = props;
   return (
     <Container>
@@ -144,4 +147,4 @@ export const Button = (props: ButtonProps) => {
       </Show>
     </Container>
   );
-};
+});

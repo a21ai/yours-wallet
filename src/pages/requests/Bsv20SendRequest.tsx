@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import styled from 'styled-components';
 import { validate } from 'bitcoin-address-validation';
 import { Button } from '../../components/Button';
@@ -42,9 +42,12 @@ export const Bsv20SendRequest = (props: Bsv20SendRequestProps) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [token, setToken] = useState<Token>();
   const isPasswordRequired = chromeStorageService.isPasswordRequired();
-  const tokenIcon =
-    (token?.icon && `${gorillaPoolService.getBaseUrl(chromeStorageService.getNetwork())}/content/${token.icon}`) ||
-    GENERIC_TOKEN_ICON;
+  const tokenIcon = useMemo(() => {
+    return (
+      (token?.icon && `${gorillaPoolService.getBaseUrl(chromeStorageService.getNetwork())}/content/${token.icon}`) ||
+      GENERIC_TOKEN_ICON
+    );
+  }, [token?.icon, gorillaPoolService, chromeStorageService]);
 
   useEffect(() => {
     (async () => {
@@ -54,9 +57,9 @@ export const Bsv20SendRequest = (props: Bsv20SendRequestProps) => {
       setToken(token);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [request, gorillaPoolService]);
 
-  const processBsv20Send = async () => {
+  const processBsv20Send = useCallback(async () => {
     try {
       if (!token) return;
       const validationFail = new Map<string, boolean>();
@@ -103,7 +106,17 @@ export const Bsv20SendRequest = (props: Bsv20SendRequestProps) => {
     } finally {
       setIsProcessing(false);
     }
-  };
+  }, [
+    token,
+    request.address,
+    request.amount,
+    request.idOrTick,
+    sendBSV20,
+    passwordConfirm,
+    addSnackbar,
+    onResponse,
+    setIsProcessing,
+  ]);
 
   useEffect(() => {
     handleSelect('bsv');
@@ -111,25 +124,28 @@ export const Bsv20SendRequest = (props: Bsv20SendRequestProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [handleSelect, hideMenu]);
 
-  const handleSendBsv20 = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setIsProcessing(true);
-    await sleep(25);
+  const handleSendBsv20 = useCallback(
+    async (e: React.FormEvent<HTMLFormElement>) => {
+      e.preventDefault();
+      setIsProcessing(true);
+      await sleep(25);
 
-    if (!passwordConfirm && isPasswordRequired) {
-      addSnackbar('You must enter a password!', 'error');
-      setIsProcessing(false);
-      return;
-    }
+      if (!passwordConfirm && isPasswordRequired) {
+        addSnackbar('You must enter a password!', 'error');
+        setIsProcessing(false);
+        return;
+      }
 
-    processBsv20Send();
-  };
+      processBsv20Send();
+    },
+    [passwordConfirm, isPasswordRequired, addSnackbar, setIsProcessing, processBsv20Send],
+  );
 
-  const clearRequest = async () => {
+  const clearRequest = useCallback(async () => {
     await chromeStorageService.remove('sendBsv20Request');
     if (popupId) removeWindow(popupId);
     window.location.reload();
-  };
+  }, [chromeStorageService, popupId]);
 
   return (
     <>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { validate } from 'bitcoin-address-validation';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
@@ -17,6 +17,8 @@ import { getErrorMessage, getTxFromRawTxFormat } from '../../utils/tools';
 import { IndexContext } from 'spv-store';
 import TxPreview from '../../components/TxPreview';
 import { styled } from 'styled-components';
+
+const MemoizedTxPreview = memo(TxPreview);
 
 const Wrapper = styled(ConfirmContent)`
   max-height: calc(100vh - 8rem);
@@ -50,95 +52,103 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
   const noApprovalLimit = settings.noApprovalLimit ?? 0;
   const isPasswordRequired = chromeStorageService.isPasswordRequired();
 
-  const requestSats = request.reduce((a: number, item: { satoshis: number }) => a + item.satoshis, 0);
-  const bsvSendAmount = requestSats / BSV_DECIMAL_CONVERSION;
+  const requestSats = useMemo(
+    () => request.reduce((a: number, item: { satoshis: number }) => a + item.satoshis, 0),
+    [request],
+  );
 
-  const processBsvSend = async (showPreview = false) => {
-    try {
-      const validationFail = new Map<string, boolean>();
-      validationFail.set('address', false);
-      validationFail.set('script', false);
-      validationFail.set('data', false);
+  const bsvSendAmount = useMemo(() => requestSats / BSV_DECIMAL_CONVERSION, [requestSats]);
 
-      request.forEach((req, idx) => {
-        if (req.script?.length === 0) {
-          validationFail.set('script', true);
-          return;
-        } else if (req.data) {
-          if (req.data.length === 0) {
-            validationFail.set('data', true);
+  const buttonLabel = useMemo(() => `Approve ${requestSats / BSV_DECIMAL_CONVERSION} BSV`, [requestSats]);
+
+  const processBsvSend = useCallback(
+    async (showPreview = false) => {
+      try {
+        const validationFail = new Map<string, boolean>();
+        validationFail.set('address', false);
+        validationFail.set('script', false);
+        validationFail.set('data', false);
+
+        request.forEach((req, idx) => {
+          if (req.script?.length === 0) {
+            validationFail.set('script', true);
             return;
+          } else if (req.data) {
+            if (req.data.length === 0) {
+              validationFail.set('data', true);
+              return;
+            }
           }
-        }
-        if (req.address) {
-          if (req.address.includes('@')) {
-            request[idx].paymail = req.address;
-            request[idx].address = undefined;
-            return;
+          if (req.address) {
+            if (req.address.includes('@')) {
+              request[idx].paymail = req.address;
+              request[idx].address = undefined;
+              return;
+            }
+            if (!validate(req.address)) {
+              validationFail.set('address', true);
+              return;
+            }
           }
-          if (!validate(req.address)) {
-            validationFail.set('address', true);
-            return;
-          }
-        }
-      });
-
-      let validationErrorMessage = '';
-      if (validationFail.get('script')) {
-        validationErrorMessage = 'Found an invalid script.';
-      } else if (validationFail.get('data')) {
-        validationErrorMessage = 'Found an invalid data.';
-      } else if (validationFail.get('address')) {
-        validationErrorMessage = 'Found an invalid receive address.';
-      }
-
-      if (validationErrorMessage) {
-        addSnackbar(validationErrorMessage, 'error');
-        return;
-      }
-
-      if (request[0].address && !request[0].satoshis) {
-        addSnackbar('No sats supplied', 'info');
-        return;
-      }
-
-      const sendRes = await sendBsv(request, passwordConfirm, noApprovalLimit, showPreview);
-      if (!sendRes.txid && sendRes.rawtx) {
-        const tx = getTxFromRawTxFormat(sendRes.rawtx, 'tx');
-        const parsedTx = await oneSatSPV.parseTx(tx);
-        setTxData(parsedTx);
-        return;
-      }
-
-      if (!sendRes.txid || sendRes.error) {
-        addSnackbar(getErrorMessage(sendRes.error), 'error');
-        return;
-      }
-
-      setSuccessTxId(sendRes.txid);
-      addSnackbar('Transaction Successful!', 'success');
-      await sleep(2000);
-      onResponse();
-
-      if (!requestWithinApp) {
-        sendMessage({
-          action: 'sendBsvResponse',
-          txid: sendRes.txid,
-          rawtx: sendRes.rawtx,
         });
+
+        let validationErrorMessage = '';
+        if (validationFail.get('script')) {
+          validationErrorMessage = 'Found an invalid script.';
+        } else if (validationFail.get('data')) {
+          validationErrorMessage = 'Found an invalid data.';
+        } else if (validationFail.get('address')) {
+          validationErrorMessage = 'Found an invalid receive address.';
+        }
+
+        if (validationErrorMessage) {
+          addSnackbar(validationErrorMessage, 'error');
+          return;
+        }
+
+        if (request[0].address && !request[0].satoshis) {
+          addSnackbar('No sats supplied', 'info');
+          return;
+        }
+
+        const sendRes = await sendBsv(request, passwordConfirm, noApprovalLimit, showPreview);
+        if (!sendRes.txid && sendRes.rawtx) {
+          const tx = getTxFromRawTxFormat(sendRes.rawtx, 'tx');
+          const parsedTx = await oneSatSPV.parseTx(tx);
+          setTxData(parsedTx);
+          return;
+        }
+
+        if (!sendRes.txid || sendRes.error) {
+          addSnackbar(getErrorMessage(sendRes.error), 'error');
+          return;
+        }
+
+        setSuccessTxId(sendRes.txid);
+        addSnackbar('Transaction Successful!', 'success');
+        await sleep(2000);
+        onResponse();
+
+        if (!requestWithinApp) {
+          sendMessage({
+            action: 'sendBsvResponse',
+            txid: sendRes.txid,
+            rawtx: sendRes.rawtx,
+          });
+        }
+      } catch (error) {
+        console.log(error);
+      } finally {
+        setIsProcessing(false);
       }
-    } catch (error) {
-      console.log(error);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
+    },
+    [request, passwordConfirm, noApprovalLimit, sendBsv, oneSatSPV, addSnackbar, onResponse, requestWithinApp],
+  );
 
   useEffect(() => {
     if (!request) return;
     processBsvSend(true); // Show preview
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [request]);
+  }, [request, processBsvSend]);
 
   // This useEffect used to auto process requests when an approval limit is set
   useEffect(() => {
@@ -153,8 +163,7 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
         await updateBsvBalance();
       }, 100);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bsvSendAmount, hasSent, noApprovalLimit]);
+  }, [bsvSendAmount, hasSent, noApprovalLimit, processBsvSend, request.length, updateBsvBalance]);
 
   // This useEffect used to process yours wallet donations within the app
   useEffect(() => {
@@ -163,11 +172,11 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
     hideMenu();
   }, [requestWithinApp, handleSelect, hideMenu]);
 
-  const resetSendState = () => {
+  const resetSendState = useCallback(() => {
     setPasswordConfirm('');
     setSuccessTxId('');
     setIsProcessing(false);
-  };
+  }, []);
 
   useEffect(() => {
     if (!successTxId) return;
@@ -175,29 +184,31 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
       resetSendState();
       updateBsvBalance();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bsvAddress, message, successTxId]);
+  }, [bsvAddress, message, successTxId, resetSendState, updateBsvBalance]);
 
-  const handleSendBsv = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setIsProcessing(true);
-    await sleep(25);
+  const handleSendBsv = useCallback(
+    async (e: React.FormEvent<HTMLFormElement>) => {
+      e.preventDefault();
+      setIsProcessing(true);
+      await sleep(25);
 
-    if (noApprovalLimit === undefined) throw Error('No approval limit must be a number');
-    if (!passwordConfirm && isPasswordRequired && bsvSendAmount > noApprovalLimit) {
-      addSnackbar('You must enter a password!', 'error');
-      setIsProcessing(false);
-      return;
-    }
+      if (noApprovalLimit === undefined) throw Error('No approval limit must be a number');
+      if (!passwordConfirm && isPasswordRequired && bsvSendAmount > noApprovalLimit) {
+        addSnackbar('You must enter a password!', 'error');
+        setIsProcessing(false);
+        return;
+      }
 
-    processBsvSend();
-  };
+      processBsvSend();
+    },
+    [noApprovalLimit, isPasswordRequired, bsvSendAmount, passwordConfirm, addSnackbar, processBsvSend],
+  );
 
-  const clearRequest = async () => {
+  const clearRequest = useCallback(async () => {
     await chromeStorageService.remove('sendBsvRequest');
     if (popupId) removeWindow(popupId);
     window.location.reload();
-  };
+  }, [chromeStorageService, popupId]);
 
   return (
     <>
@@ -221,14 +232,8 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
                 onChange={(e) => setPasswordConfirm(e.target.value)}
               />
             </Show>
-            {txData && <TxPreview txData={txData} />}
-            <Button
-              theme={theme}
-              type="primary"
-              label={`Approve ${request.reduce((a, item) => a + item.satoshis, 0) / BSV_DECIMAL_CONVERSION} BSV`}
-              disabled={isProcessing}
-              isSubmit
-            />
+            {txData && <MemoizedTxPreview txData={txData} />}
+            <Button theme={theme} type="primary" label={buttonLabel} disabled={isProcessing} isSubmit />
             <Button theme={theme} type="secondary" label="Cancel" onClick={clearRequest} disabled={isProcessing} />
           </FormContainer>
         </Wrapper>

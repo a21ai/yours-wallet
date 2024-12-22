@@ -1,4 +1,5 @@
 import { styled } from 'styled-components';
+import React from 'react';
 import { Text } from './Reusable';
 import { Show } from './Show';
 import { Bsv20 } from 'yours-wallet-provider';
@@ -51,7 +52,7 @@ export type Bsv20TokensListProps = {
   onTokenClick: (token: Bsv20) => void;
 };
 
-export const Bsv20TokensList = (props: Bsv20TokensListProps) => {
+const Bsv20TokensListComponent = (props: Bsv20TokensListProps) => {
   const { bsv20s, theme, onTokenClick, hideStatusLabels = false } = props;
   const { gorillaPoolService, ordinalService, bsvService, chromeStorageService } = useServiceContext();
   const network = chromeStorageService.getNetwork();
@@ -232,3 +233,5 @@ export const Bsv20TokensList = (props: Bsv20TokensListProps) => {
     </>
   );
 };
+
+export const Bsv20TokensList = React.memo(Bsv20TokensListComponent);

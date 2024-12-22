@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { Broadcast } from 'yours-wallet-provider';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
@@ -77,92 +77,140 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [message, txid]);
 
-  useEffect(() => {
-    if (!bsvAddress || !ordAddress || !identityAddress || !oneSatSPV || !txData) return;
-    (async () => {
-      console.log(bsvAddress, ordAddress, identityAddress);
-      // how much did the user put in to the tx
-      let userSatsOut = txData.spends.reduce((acc, spend) => {
-        if (spend.owner && [bsvAddress, ordAddress, identityAddress].includes(spend.owner)) {
+  const userAddresses = useMemo(() => {
+    if (!bsvAddress || !ordAddress || !identityAddress) return [];
+    return [bsvAddress, ordAddress, identityAddress];
+  }, [bsvAddress, ordAddress, identityAddress]);
+
+  const calculateUserSatsOut = useCallback(
+    (txData: IndexContext) => {
+      if (!txData || userAddresses.length === 0) return 0n;
+
+      // Calculate how much the user put into the tx
+      const spendSats = txData.spends.reduce((acc, spend) => {
+        if (spend.owner && userAddresses.includes(spend.owner)) {
           return acc + spend.satoshis;
         }
         return acc;
       }, 0n);
 
-      // how much did the user get back from the tx
-      userSatsOut = txData.txos.reduce((acc, txo) => {
-        if (txo.owner && [bsvAddress, ordAddress, identityAddress].includes(txo.owner)) {
+      // Calculate how much the user got back from the tx
+      return txData.txos.reduce((acc, txo) => {
+        if (txo.owner && userAddresses.includes(txo.owner)) {
           return acc - txo.satoshis;
         }
         return acc;
-      }, userSatsOut);
+      }, spendSats);
+    },
+    [userAddresses],
+  );
 
-      setSatsOut(Number(userSatsOut));
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [txData]);
+  useEffect(() => {
+    if (!txData) return;
+    const satsOutValue = calculateUserSatsOut(txData);
+    setSatsOut(Number(satsOutValue));
+  }, [txData, calculateUserSatsOut]);
 
-  const handleBroadcast = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    try {
-      setIsProcessing(true);
-      await sleep(25);
+  const handleBroadcast = useCallback(
+    async (e: React.FormEvent<HTMLFormElement>) => {
+      e.preventDefault();
+      try {
+        setIsProcessing(true);
+        await sleep(25);
 
-      let rawtx = request.rawtx;
-      if (request.fund) {
-        if (!passwordConfirm) {
-          addSnackbar('Must enter a password!', 'error');
+        let rawtx = request.rawtx;
+        if (request.fund) {
+          if (!passwordConfirm) {
+            addSnackbar('Must enter a password!', 'error');
+            setIsProcessing(false);
+            return;
+          }
+
+          const res = await bsvService.fundRawTx(rawtx, passwordConfirm);
+          if (!res.rawtx || res.error) {
+            const message =
+              res.error === 'invalid-password'
+                ? 'Invalid Password!'
+                : 'An unknown error has occurred! Try again.' + res.error;
+
+            addSnackbar(message, 'error');
+            setIsProcessing(false);
+            return;
+          }
+          rawtx = res.rawtx;
+        }
+        const tx = getTxFromRawTxFormat(rawtx, request.format || 'tx');
+
+        const resp = await oneSatSPV.broadcast(tx, 'provider', request.format === 'beef');
+        if (resp.status === 'error') {
+          addSnackbar('Error broadcasting the raw tx!', 'error');
           setIsProcessing(false);
+          sendMessage({
+            action: 'broadcastResponse',
+            error: resp.description ?? 'Unknown error',
+          });
+          onBroadcast();
           return;
         }
-
-        const res = await bsvService.fundRawTx(rawtx, passwordConfirm);
-        if (!res.rawtx || res.error) {
-          const message =
-            res.error === 'invalid-password'
-              ? 'Invalid Password!'
-              : 'An unknown error has occurred! Try again.' + res.error;
-
-          addSnackbar(message, 'error');
-          setIsProcessing(false);
-          return;
-        }
-        rawtx = res.rawtx;
-      }
-      const tx = getTxFromRawTxFormat(rawtx, request.format || 'tx');
-
-      const resp = await oneSatSPV.broadcast(tx, 'provider', request.format === 'beef');
-      if (resp.status === 'error') {
-        addSnackbar('Error broadcasting the raw tx!', 'error');
-        setIsProcessing(false);
+        setTxid(resp.txid);
         sendMessage({
           action: 'broadcastResponse',
-          error: resp.description ?? 'Unknown error',
+          txid: resp.txid,
         });
+
+        addSnackbar('Successfully broadcasted the tx!', 'success');
+        await sleep(2000);
         onBroadcast();
-        return;
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setIsProcessing(false);
       }
-      setTxid(resp.txid);
-      sendMessage({
-        action: 'broadcastResponse',
-        txid: resp.txid,
-      });
+    },
+    [request, passwordConfirm, bsvService, oneSatSPV, addSnackbar, onBroadcast],
+  );
 
-      addSnackbar('Successfully broadcasted the tx!', 'success');
-      await sleep(2000);
-      onBroadcast();
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const clearRequest = async () => {
+  const clearRequest = useCallback(async () => {
     await chromeStorageService.remove('broadcastRequest');
     if (popupId) removeWindow(popupId);
     window.location.reload();
-  };
+  }, [chromeStorageService, popupId]);
+
+  const formContent = useMemo(
+    () => (
+      <FormContainer noValidate onSubmit={handleBroadcast}>
+        <Show when={chromeStorageService.isPasswordRequired()}>
+          <Input
+            theme={theme}
+            placeholder="Enter Wallet Password"
+            type="password"
+            value={passwordConfirm}
+            onChange={(e) => setPasswordConfirm(e.target.value)}
+          />
+        </Show>
+        {txData && <TxPreview txData={txData} />}
+        <Button
+          theme={theme}
+          type="primary"
+          label={`Broadcast - ${satsOut > 0 ? satsOut / BSV_DECIMAL_CONVERSION : 0} BSV`}
+          disabled={isProcessing}
+          isSubmit
+        />
+        <Button theme={theme} type="secondary" label="Cancel" onClick={clearRequest} disabled={isProcessing} />
+      </FormContainer>
+    ),
+    [
+      handleBroadcast,
+      chromeStorageService,
+      theme,
+      passwordConfirm,
+      setPasswordConfirm,
+      txData,
+      satsOut,
+      isProcessing,
+      clearRequest,
+    ],
+  );
 
   return (
     <>
@@ -175,26 +223,7 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
           <Text theme={theme} style={{ margin: '0.75rem 0', textAlign: 'center' }}>
             The app is requesting to broadcast a transaction.
           </Text>
-          <FormContainer noValidate onSubmit={handleBroadcast}>
-            <Show when={chromeStorageService.isPasswordRequired()}>
-              <Input
-                theme={theme}
-                placeholder="Enter Wallet Password"
-                type="password"
-                value={passwordConfirm}
-                onChange={(e) => setPasswordConfirm(e.target.value)}
-              />
-            </Show>
-            {txData && <TxPreview txData={txData} />}
-            <Button
-              theme={theme}
-              type="primary"
-              label={`Broadcast - ${satsOut > 0 ? satsOut / BSV_DECIMAL_CONVERSION : 0} BSV`}
-              disabled={isProcessing}
-              isSubmit
-            />
-            <Button theme={theme} type="secondary" label="Cancel" onClick={clearRequest} disabled={isProcessing} />
-          </FormContainer>
+          {formContent}
         </Wrapper>
       </Show>
     </>

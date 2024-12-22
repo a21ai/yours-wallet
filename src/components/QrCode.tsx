@@ -1,3 +1,4 @@
+import React from 'react';
 import * as qr from 'qrcode';
 import { useEffect, useState } from 'react';
 import { styled } from 'styled-components';
@@ -14,7 +15,7 @@ export type QrCodeProps = {
   onClick?: () => void;
 };
 
-export const QrCode = (props: QrCodeProps) => {
+const QrCodeComponent = (props: QrCodeProps) => {
   const { address, onClick } = props;
   const [qrUrl, setQrUrl] = useState<string | null>(null);
 
@@ -31,3 +32,5 @@ export const QrCode = (props: QrCodeProps) => {
 
   return <>{qrUrl && <QrImage src={qrUrl} alt="Bitcoin QR Code" onClick={onClick} />}</>;
 };
+
+export const QrCode = React.memo(QrCodeComponent);

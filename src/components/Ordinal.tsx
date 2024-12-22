@@ -1,3 +1,4 @@
+import React from 'react';
 import styled from 'styled-components';
 import { Ordinal as OrdinalType } from 'yours-wallet-provider';
 import { WhiteLabelTheme, Theme } from '../theme.types';
@@ -108,7 +109,7 @@ export type OrdinalProps = {
   onClick?: () => void;
 };
 
-export const Ordinal = (props: OrdinalProps) => {
+export const Ordinal = React.memo((props: OrdinalProps) => {
   const { url, selected, isTransfer, size, inscription, theme, onClick } = props;
   const contentType = inscription?.origin?.data?.insc?.file?.type;
 
@@ -174,4 +175,4 @@ export const Ordinal = (props: OrdinalProps) => {
       </Show>
     </FlexWrapper>
   );
-};
+});

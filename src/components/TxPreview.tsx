@@ -1,3 +1,4 @@
+import React from 'react';
 import { IndexContext, Txo } from 'spv-store';
 import styled from 'styled-components';
 import { Ordinal } from 'yours-wallet-provider';
@@ -72,7 +73,7 @@ type TxPreviewProps = {
   inputsToSign?: number[];
 };
 
-const TxPreview = ({ txData, inputsToSign }: TxPreviewProps) => {
+const TxPreviewComponent = ({ txData, inputsToSign }: TxPreviewProps) => {
   const { theme } = useTheme();
   const labelMaxLength = 20;
   const mappedInputs = useMemo(() => txData?.spends.map((txo: Txo) => mapOrdinal(txo)), [txData]);
@@ -205,4 +206,5 @@ const TxPreview = ({ txData, inputsToSign }: TxPreviewProps) => {
   );
 };
 
+const TxPreview = React.memo(TxPreviewComponent);
 export default TxPreview;

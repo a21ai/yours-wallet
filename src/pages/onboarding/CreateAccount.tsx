@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
 import styled from 'styled-components';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { PageLoader } from '../../components/PageLoader';
@@ -93,179 +93,225 @@ export const CreateAccount = ({ onNavigateBack, newWallet = false }: CreateAccou
     };
   }, [hideMenu, showMenu, newWallet]);
 
-  const handleKeyGeneration = async (event?: React.FormEvent<HTMLFormElement>) => {
-    try {
-      event && event.preventDefault();
-      setLoading(true);
-      if (password.length < 8) {
-        addSnackbar(newWallet ? 'The password must be at least 8 characters!' : 'Invalid Password!', 'error');
-        return;
-      }
-
-      if (newWallet && password !== passwordConfirm) {
-        addSnackbar('The passwords do not match!', 'error');
-        return;
-      }
-
-      // Some artificial delay for the loader
-      await sleep(50);
-
-      const keys = await keysService.generateSeedAndStoreEncrypted(password, newWallet, network);
-
-      if (!keys?.mnemonic) {
-        addSnackbar('An error occurred while creating the wallet!', 'error');
-        return;
-      }
-      setSeedWords(keys.mnemonic.split(' '));
-
-      if (!keys.identityAddress) {
-        addSnackbar('An error occurred while getting the identity address!', 'error');
-        return;
-      }
-      setIdentityAddress(keys.identityAddress);
-      // Save account name and icon URL to local storage
-      await saveAccountDataToChromeStorage(chromeStorageService, accountName, iconURL);
-      setStep(2);
-    } catch (error) {
-      console.log(error);
-      addSnackbar('An error occurred while creating the account! Make sure your password is correct.', 'error');
-    } finally {
-      setLoading(false);
+  const validatePassword = useMemo(() => {
+    if (password.length < 8) {
+      return {
+        isValid: false,
+        message: newWallet ? 'The password must be at least 8 characters!' : 'Invalid Password!',
+      };
     }
-  };
+    if (newWallet && password !== passwordConfirm) {
+      return { isValid: false, message: 'The passwords do not match!' };
+    }
+    return { isValid: true, message: '' };
+  }, [password, passwordConfirm, newWallet]);
 
-  const handleCopyToClipboard = (seed: string) => {
-    navigator.clipboard.writeText(seed).then(() => {
-      addSnackbar('Copied!', 'success');
-    });
-  };
+  const handleKeyGeneration = useCallback(
+    async (event?: React.FormEvent<HTMLFormElement>) => {
+      try {
+        event && event.preventDefault();
+        setLoading(true);
+        const validation = validatePassword;
+        if (!validation.isValid) {
+          addSnackbar(validation.message, 'error');
+          return;
+        }
 
-  const passwordStep = (
-    <>
-      <HeaderText theme={theme}>{newWallet ? 'Create password' : 'New Account'}</HeaderText>
-      <Text style={{ marginBottom: '1rem' }} theme={theme}>
-        {newWallet ? 'This will be used to unlock your wallet.' : 'Enter your existing password.'}
-      </Text>
-      <FormContainer onSubmit={handleKeyGeneration}>
-        <Input
-          theme={theme}
-          placeholder="Account Name"
-          type="text"
-          value={accountName}
-          onChange={(e) => setAccountName(e.target.value)}
-        />
-        <Input
-          theme={theme}
-          placeholder="Icon URL"
-          type="text"
-          value={iconURL}
-          onChange={(e) => setIconURL(e.target.value)}
-        />
-        <Input
-          theme={theme}
-          placeholder="Password"
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-        <Show when={newWallet}>
-          <Input
-            theme={theme}
-            placeholder="Confirm password"
-            type="password"
-            value={passwordConfirm}
-            onChange={(e) => setPasswordConfirm(e.target.value)}
-          />
-        </Show>
-        <NetworkSelectWrapper>
-          <ToggleSwitch
-            theme={theme}
-            on={network === NetWork.Testnet}
-            onChange={() => setNetwork(network === NetWork.Mainnet ? NetWork.Testnet : NetWork.Mainnet)}
-          />
-          <Text theme={theme} style={{ margin: '0 0 0 0.5rem', textAlign: 'left' }}>
-            {network === NetWork.Testnet ? 'Turn off for mainnet account' : 'Turn on for testnet account'}
-          </Text>
-        </NetworkSelectWrapper>
-        <Button
-          theme={theme}
-          type="primary"
-          label={newWallet ? 'Generate Seed' : 'Create New Account'}
-          disabled={loading}
-          isSubmit
-        />
-        <Button
-          theme={theme}
-          type="secondary"
-          label="Go back"
-          onClick={() => (newWallet ? navigate('/') : onNavigateBack())}
-        />
-      </FormContainer>
-    </>
+        // Some artificial delay for the loader
+        await sleep(50);
+
+        const keys = await keysService.generateSeedAndStoreEncrypted(password, newWallet, network);
+
+        if (!keys?.mnemonic) {
+          addSnackbar('An error occurred while creating the wallet!', 'error');
+          return;
+        }
+        setSeedWords(keys.mnemonic.split(' '));
+
+        if (!keys.identityAddress) {
+          addSnackbar('An error occurred while getting the identity address!', 'error');
+          return;
+        }
+        setIdentityAddress(keys.identityAddress);
+        // Save account name and icon URL to local storage
+        await saveAccountDataToChromeStorage(chromeStorageService, accountName, iconURL);
+        setStep(2);
+      } catch (error) {
+        console.log(error);
+        addSnackbar('An error occurred while creating the account! Make sure your password is correct.', 'error');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [
+      validatePassword,
+      addSnackbar,
+      keysService,
+      chromeStorageService,
+      accountName,
+      iconURL,
+      password,
+      network,
+      newWallet,
+    ],
   );
 
-  const copySeedStep = (
-    <>
-      <HeaderText theme={theme}>Your recovery phrase</HeaderText>
-      <Text theme={theme} style={{ marginBottom: '1rem' }}>
-        Safely write down and store your seed phrase in a safe place.
-      </Text>
-      <SeedContainer theme={theme}>
-        <Text
-          style={{
-            textAlign: 'left',
-            width: '100%',
-            margin: '0',
-            color: theme.color.global.contrast,
-          }}
-          theme={theme}
-        >
-          {seedWords.join(' ').trim()}
+  const handleCopyToClipboard = useCallback(
+    (seed: string) => {
+      navigator.clipboard.writeText(seed).then(() => {
+        addSnackbar('Copied!', 'success');
+      });
+    },
+    [addSnackbar],
+  );
+
+  const passwordStep = useMemo(
+    () => (
+      <>
+        <HeaderText theme={theme}>{newWallet ? 'Create password' : 'New Account'}</HeaderText>
+        <Text style={{ marginBottom: '1rem' }} theme={theme}>
+          {newWallet ? 'This will be used to unlock your wallet.' : 'Enter your existing password.'}
         </Text>
-        <CopyToClipboardContainer onClick={() => handleCopyToClipboard(seedWords.join(' ').trim())}>
-          <FaCopy size={'0.85rem'} color={theme.color.component.primaryButtonRightGradient} />
+        <FormContainer onSubmit={handleKeyGeneration}>
+          <Input
+            theme={theme}
+            placeholder="Account Name"
+            type="text"
+            value={accountName}
+            onChange={(e) => setAccountName(e.target.value)}
+          />
+          <Input
+            theme={theme}
+            placeholder="Icon URL"
+            type="text"
+            value={iconURL}
+            onChange={(e) => setIconURL(e.target.value)}
+          />
+          <Input
+            theme={theme}
+            placeholder="Password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+          <Show when={newWallet}>
+            <Input
+              theme={theme}
+              placeholder="Confirm password"
+              type="password"
+              value={passwordConfirm}
+              onChange={(e) => setPasswordConfirm(e.target.value)}
+            />
+          </Show>
+          <NetworkSelectWrapper>
+            <ToggleSwitch
+              theme={theme}
+              on={network === NetWork.Testnet}
+              onChange={() => setNetwork(network === NetWork.Mainnet ? NetWork.Testnet : NetWork.Mainnet)}
+            />
+            <Text theme={theme} style={{ margin: '0 0 0 0.5rem', textAlign: 'left' }}>
+              {network === NetWork.Testnet ? 'Turn off for mainnet account' : 'Turn on for testnet account'}
+            </Text>
+          </NetworkSelectWrapper>
+          <Button
+            theme={theme}
+            type="primary"
+            label={newWallet ? 'Generate Seed' : 'Create New Account'}
+            disabled={loading}
+            isSubmit
+          />
+          <Button
+            theme={theme}
+            type="secondary"
+            label="Go back"
+            onClick={() => (newWallet ? navigate('/') : onNavigateBack())}
+          />
+        </FormContainer>
+      </>
+    ),
+    [
+      theme,
+      network,
+      password,
+      passwordConfirm,
+      accountName,
+      iconURL,
+      loading,
+      newWallet,
+      navigate,
+      onNavigateBack,
+      handleKeyGeneration,
+    ],
+  );
+
+  const copySeedStep = useMemo(
+    () => (
+      <>
+        <HeaderText theme={theme}>Your recovery phrase</HeaderText>
+        <Text theme={theme} style={{ marginBottom: '1rem' }}>
+          Safely write down and store your seed phrase in a safe place.
+        </Text>
+        <SeedContainer theme={theme}>
           <Text
             style={{
-              color: theme.color.component.primaryButtonRightGradient,
-              textDecoration: 'underline',
-              margin: '0 0 0 0.5rem',
               textAlign: 'left',
-              fontSize: '0.75rem',
+              width: '100%',
+              margin: '0',
+              color: theme.color.global.contrast,
             }}
             theme={theme}
           >
-            Copy to clipboard
+            {seedWords.join(' ').trim()}
           </Text>
-        </CopyToClipboardContainer>
-      </SeedContainer>
-      <Button
-        theme={theme}
-        type="primary"
-        label="Next"
-        onClick={async () => {
-          setSeedWords([]);
-          await chromeStorageService.switchAccount(identityAddress);
-          setStep(3);
-        }}
-      />
-    </>
+          <CopyToClipboardContainer onClick={() => handleCopyToClipboard(seedWords.join(' ').trim())}>
+            <FaCopy size={'0.85rem'} color={theme.color.component.primaryButtonRightGradient} />
+            <Text
+              style={{
+                color: theme.color.component.primaryButtonRightGradient,
+                textDecoration: 'underline',
+                margin: '0 0 0 0.5rem',
+                textAlign: 'left',
+                fontSize: '0.75rem',
+              }}
+              theme={theme}
+            >
+              Copy to clipboard
+            </Text>
+          </CopyToClipboardContainer>
+        </SeedContainer>
+        <Button
+          theme={theme}
+          type="primary"
+          label="Next"
+          onClick={async () => {
+            setSeedWords([]);
+            await chromeStorageService.switchAccount(identityAddress);
+            setStep(3);
+          }}
+        />
+      </>
+    ),
+    [theme, seedWords, handleCopyToClipboard, identityAddress, chromeStorageService],
   );
 
-  const successStep = (
-    <>
-      <HeaderText theme={theme}>Success!</HeaderText>
-      <Text theme={theme} style={{ marginBottom: '1rem' }}>
-        Your wallet is ready to go.
-      </Text>
-      <Button
-        theme={theme}
-        type="primary"
-        label="Enter"
-        onClick={() => {
-          window.location.reload();
-        }}
-      />
-    </>
+  const successStep = useMemo(
+    () => (
+      <>
+        <HeaderText theme={theme}>Success!</HeaderText>
+        <Text theme={theme} style={{ marginBottom: '1rem' }}>
+          Your wallet is ready to go.
+        </Text>
+        <Button
+          theme={theme}
+          type="primary"
+          label="Enter"
+          onClick={() => {
+            window.location.reload();
+          }}
+        />
+      </>
+    ),
+    [theme],
   );
 
   return (
