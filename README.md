@@ -24,6 +24,7 @@ Yours Wallet is an open-source and non-custodial web3 SPV wallet for Bitcoin SV 
 #### Performance Profiling 🔍
 
 For development and performance analysis:
+
 1. Install [React Scan](https://react-scan.com)
    - Available as a Chrome extension
    - No code changes required - just drop it in
