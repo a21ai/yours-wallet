@@ -241,39 +241,51 @@ export const OrdWallet = () => {
     setCommonAddress('');
   };
 
-  const refreshOrdinals = async () => {
+  const refreshOrdinals = useCallback(async () => {
     const data = await getOrdinals();
     setOrdinals(data.ordinals);
     setFrom(data.from);
-  };
+  }, [getOrdinals, setOrdinals, setFrom]);
 
-  const handleMultiTransferOrdinal = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setIsProcessing(true);
+  const handleMultiTransferOrdinal = useCallback(
+    async (e: React.FormEvent<HTMLFormElement>) => {
+      e.preventDefault();
+      setIsProcessing(true);
 
-    await sleep(25);
+      await sleep(25);
 
-    if (!passwordConfirm && isPasswordRequired) {
-      addSnackbar('You must enter a password!', 'error');
-      setIsProcessing(false);
-      return;
-    }
+      if (!passwordConfirm && isPasswordRequired) {
+        addSnackbar('You must enter a password!', 'error');
+        setIsProcessing(false);
+        return;
+      }
 
-    const destinationAddresses = Object.values(addresses);
-    const outpoints = Object.keys(addresses);
+      const destinationAddresses = Object.values(addresses);
+      const outpoints = Object.keys(addresses);
 
-    const transferRes = await transferOrdinalsMulti({ outpoints, destinationAddresses, password: passwordConfirm });
+      const transferRes = await transferOrdinalsMulti({ outpoints, destinationAddresses, password: passwordConfirm });
 
-    if (!transferRes.txid || transferRes.error) {
-      addSnackbar(getErrorMessage(transferRes.error), 'error');
-      setIsProcessing(false);
-      return;
-    }
+      if (!transferRes.txid || transferRes.error) {
+        addSnackbar(getErrorMessage(transferRes.error), 'error');
+        setIsProcessing(false);
+        return;
+      }
 
-    setSuccessTxId(transferRes.txid);
-    addSnackbar('Transfer Successful!', 'success');
-    refreshOrdinals();
-  };
+      setSuccessTxId(transferRes.txid);
+      addSnackbar('Transfer Successful!', 'success');
+      refreshOrdinals();
+    },
+    [
+      isPasswordRequired,
+      passwordConfirm,
+      addresses,
+      transferOrdinalsMulti,
+      addSnackbar,
+      refreshOrdinals,
+      setIsProcessing,
+      setSuccessTxId,
+    ],
+  );
 
   const handleListOrdinal = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -317,31 +329,43 @@ export const OrdWallet = () => {
     refreshOrdinals();
   };
 
-  const handleCancelListing = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setIsProcessing(true);
+  const handleCancelListing = useCallback(
+    async (e: React.FormEvent<HTMLFormElement>) => {
+      e.preventDefault();
+      setIsProcessing(true);
 
-    await sleep(25);
-    if (!passwordConfirm && isPasswordRequired) {
-      addSnackbar('You must enter a password!', 'error');
-      setIsProcessing(false);
-      return;
-    }
+      await sleep(25);
+      if (!passwordConfirm && isPasswordRequired) {
+        addSnackbar('You must enter a password!', 'error');
+        setIsProcessing(false);
+        return;
+      }
 
-    const ordinalOutpoint = selectedOrdinals[0].outpoint;
+      const ordinalOutpoint = selectedOrdinals[0].outpoint;
 
-    const cancelRes = await cancelGlobalOrderbookListing(ordinalOutpoint, passwordConfirm);
+      const cancelRes = await cancelGlobalOrderbookListing(ordinalOutpoint, passwordConfirm);
 
-    if (!cancelRes.txid || cancelRes.error) {
-      addSnackbar(getErrorMessage(cancelRes.error), 'error');
-      setIsProcessing(false);
-      return;
-    }
+      if (!cancelRes.txid || cancelRes.error) {
+        addSnackbar(getErrorMessage(cancelRes.error), 'error');
+        setIsProcessing(false);
+        return;
+      }
 
-    setSuccessTxId(cancelRes.txid);
-    addSnackbar('Successfully canceled the listing!', 'success');
-    refreshOrdinals();
-  };
+      setSuccessTxId(cancelRes.txid);
+      addSnackbar('Successfully canceled the listing!', 'success');
+      refreshOrdinals();
+    },
+    [
+      passwordConfirm,
+      isPasswordRequired,
+      selectedOrdinals,
+      cancelGlobalOrderbookListing,
+      addSnackbar,
+      refreshOrdinals,
+      setIsProcessing,
+      setSuccessTxId,
+    ],
+  );
 
   const handleAddressChange = useCallback((outpoint: string, address: string) => {
     setAddresses((prev) => ({ ...prev, [outpoint]: address }));
@@ -415,38 +439,43 @@ export const OrdWallet = () => {
     </>
   );
 
-  const renderTransfers = (selectedOrdinals: OrdType[]) => {
-    return selectedOrdinals.map((ordinal) => (
-      <OrdinalItem theme={theme} key={ordinal.origin?.outpoint}>
-        <Ordinal
-          theme={theme}
-          inscription={ordinal as OrdinalType}
-          url={`${gorillaPoolService.getBaseUrl(network)}/content/${ordinal.origin?.outpoint}?outpoint=${ordinal?.outpoint}`}
-          isTransfer
-          size="3rem"
-        />
-        <OrdinalDetails>
-          <OrdinalTitle theme={theme}>
-            {truncate(
-              `${ordinal?.origin?.data?.map?.name ?? ordinal?.origin?.data?.map?.subTypeData?.name ?? 'Unknown'}`,
-              15,
-              0,
-            )}
-          </OrdinalTitle>
-          <Show when={!useSameAddress}>
-            <ReceiverInput
-              theme={theme}
-              placeholder="Receiver Address"
-              type="text"
-              onChange={(e) => handleAddressChange(ordinal.outpoint, e.target.value)}
-              value={addresses[ordinal.outpoint] || ''}
-            />
-            {addressErrors[ordinal.outpoint] && <span style={{ color: 'red' }}>{addressErrors[ordinal.outpoint]}</span>}
-          </Show>
-        </OrdinalDetails>
-      </OrdinalItem>
-    ));
-  };
+  const renderTransfers = useCallback(
+    (selectedOrdinals: OrdType[]) => {
+      return selectedOrdinals.map((ordinal) => (
+        <OrdinalItem theme={theme} key={ordinal.origin?.outpoint}>
+          <Ordinal
+            theme={theme}
+            inscription={ordinal as OrdinalType}
+            url={`${gorillaPoolService.getBaseUrl(network)}/content/${ordinal.origin?.outpoint}?outpoint=${ordinal?.outpoint}`}
+            isTransfer
+            size="3rem"
+          />
+          <OrdinalDetails>
+            <OrdinalTitle theme={theme}>
+              {truncate(
+                `${ordinal?.origin?.data?.map?.name ?? ordinal?.origin?.data?.map?.subTypeData?.name ?? 'Unknown'}`,
+                15,
+                0,
+              )}
+            </OrdinalTitle>
+            <Show when={!useSameAddress}>
+              <ReceiverInput
+                theme={theme}
+                placeholder="Receiver Address"
+                type="text"
+                onChange={(e) => handleAddressChange(ordinal.outpoint, e.target.value)}
+                value={addresses[ordinal.outpoint] || ''}
+              />
+              {addressErrors[ordinal.outpoint] && (
+                <span style={{ color: 'red' }}>{addressErrors[ordinal.outpoint]}</span>
+              )}
+            </Show>
+          </OrdinalDetails>
+        </OrdinalItem>
+      ));
+    },
+    [theme, gorillaPoolService, network, useSameAddress, addresses, addressErrors, handleAddressChange],
+  );
 
   const MultiSendUI = (
     <ContentWrapper>

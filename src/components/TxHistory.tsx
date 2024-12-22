@@ -1,4 +1,5 @@
 import { styled } from 'styled-components';
+import React from 'react';
 import { Theme, WhiteLabelTheme } from '../theme.types';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { useEffect, useMemo, useState } from 'react';
@@ -123,7 +124,7 @@ export type TxHistoryProps = {
   onBack: () => void;
 };
 
-export const TxHistory = (props: TxHistoryProps) => {
+const TxHistoryComponent = (props: TxHistoryProps) => {
   const { theme, onBack } = props;
   const [data, setData] = useState<TxLog[]>();
   const [isSlidingOut, setIsSlidingOut] = useState(false);
@@ -408,3 +409,5 @@ export const TxHistory = (props: TxHistoryProps) => {
     </Container>
   );
 };
+
+export const TxHistory = React.memo(TxHistoryComponent);

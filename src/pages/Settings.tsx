@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import styled from 'styled-components';
 import x from '../assets/x.svg';
 import { Button } from '../components/Button';
@@ -158,23 +158,26 @@ export const Settings = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleRemoveDomain = async (domain: string) => {
-    const newList = connectedApps.filter((app) => app.domain !== domain);
-    const { account } = chromeStorageService.getCurrentAccountObject();
-    if (!account) return [];
-    const key: keyof ChromeStorageObject = 'accounts';
-    const update: Partial<ChromeStorageObject['accounts']> = {
-      [keysService.identityAddress]: {
-        ...account,
-        settings: {
-          ...account.settings,
-          whitelist: newList,
+  const handleRemoveDomain = useCallback(
+    async (domain: string) => {
+      const newList = connectedApps.filter((app) => app.domain !== domain);
+      const { account } = chromeStorageService.getCurrentAccountObject();
+      if (!account) return [];
+      const key: keyof ChromeStorageObject = 'accounts';
+      const update: Partial<ChromeStorageObject['accounts']> = {
+        [keysService.identityAddress]: {
+          ...account,
+          settings: {
+            ...account.settings,
+            whitelist: newList,
+          },
         },
-      },
-    };
-    await chromeStorageService.updateNested(key, update);
-    setConnectedApps(newList);
-  };
+      };
+      await chromeStorageService.updateNested(key, update);
+      setConnectedApps(newList);
+    },
+    [connectedApps, chromeStorageService, keysService.identityAddress, setConnectedApps],
+  );
 
   const handleDeleteAccountIntent = () => {
     setDecisionType('delete-account');
@@ -182,11 +185,11 @@ export const Settings = () => {
     setShowSpeedBump(true);
   };
 
-  const handleSignOutIntent = () => {
+  const handleSignOutIntent = useCallback(() => {
     setDecisionType('sign-out');
     setSpeedBumpMessage('Make sure you have your seed phrase backed up!');
     setShowSpeedBump(true);
-  };
+  }, [setDecisionType, setSpeedBumpMessage, setShowSpeedBump]);
 
   const handleMasterBackupIntent = () => {
     setDecisionType('export-master-backup');
@@ -212,15 +215,15 @@ export const Settings = () => {
     setShowSpeedBump(true);
   };
 
-  const handleSocialProfileSave = () => {
+  const handleSocialProfileSave = useCallback(() => {
     storeSocialProfile({
       displayName: enteredSocialDisplayName,
       avatar: enteredSocialAvatar,
     });
     setPage('main');
-  };
+  }, [storeSocialProfile, enteredSocialDisplayName, enteredSocialAvatar, setPage]);
 
-  const handleAccountEditSave = async () => {
+  const handleAccountEditSave = useCallback(async () => {
     const accounts = chromeStorageService.getAllAccounts();
     const account = accounts.find((acc) => acc.addresses.identityAddress === selectedAccountIdentityAddress);
     if (!account || !selectedAccountIdentityAddress) return;
@@ -235,7 +238,14 @@ export const Settings = () => {
     await chromeStorageService.updateNested(key, update);
     setSelectedAccountIdentityAddress(undefined);
     setPage('main');
-  };
+  }, [
+    chromeStorageService,
+    selectedAccountIdentityAddress,
+    enteredAccountName,
+    enteredAccountIcon,
+    setSelectedAccountIdentityAddress,
+    setPage,
+  ]);
 
   const handleDeleteAccount = async () => {
     if (!selectedAccountIdentityAddress) {
@@ -355,23 +365,26 @@ export const Settings = () => {
     }
   };
 
-  const handleUpdatePasswordRequirement = async (isRequired: boolean) => {
-    setIsPasswordRequired(isRequired);
-    const { account } = chromeStorageService.getCurrentAccountObject();
-    if (!account) throw new Error('No account found');
-    const accountSettings = account.settings;
-    const key: keyof ChromeStorageObject = 'accounts';
-    const update: Partial<ChromeStorageObject['accounts']> = {
-      [keysService.identityAddress]: {
-        ...account,
-        settings: {
-          ...accountSettings,
-          isPasswordRequired: isRequired,
+  const handleUpdatePasswordRequirement = useCallback(
+    async (isRequired: boolean) => {
+      setIsPasswordRequired(isRequired);
+      const { account } = chromeStorageService.getCurrentAccountObject();
+      if (!account) throw new Error('No account found');
+      const accountSettings = account.settings;
+      const key: keyof ChromeStorageObject = 'accounts';
+      const update: Partial<ChromeStorageObject['accounts']> = {
+        [keysService.identityAddress]: {
+          ...account,
+          settings: {
+            ...accountSettings,
+            isPasswordRequired: isRequired,
+          },
         },
-      },
-    };
-    await chromeStorageService.updateNested(key, update);
-  };
+      };
+      await chromeStorageService.updateNested(key, update);
+    },
+    [chromeStorageService, keysService.identityAddress, setIsPasswordRequired],
+  );
 
   const handleUpdateApprovalLimit = async (amount: number) => {
     setNoApprovalLimit(amount);
@@ -390,26 +403,29 @@ export const Settings = () => {
     await chromeStorageService.updateNested(key, update);
   };
 
-  const handleUpdateCustomFeeRate = async (rate: number) => {
-    if (rate < 1) {
-      addSnackbar('Fee rate must be at least 1 sat/byte', 'error');
-      return;
-    }
-    setCustomFeeRate(rate);
-    const { account } = chromeStorageService.getCurrentAccountObject();
-    if (!account) throw new Error('No account found');
-    const key: keyof ChromeStorageObject = 'accounts';
-    const update: Partial<ChromeStorageObject['accounts']> = {
-      [keysService.identityAddress]: {
-        ...account,
-        settings: {
-          ...account.settings,
-          customFeeRate: rate,
+  const handleUpdateCustomFeeRate = useCallback(
+    async (rate: number) => {
+      if (rate < 1) {
+        addSnackbar('Fee rate must be at least 1 sat/byte', 'error');
+        return;
+      }
+      setCustomFeeRate(rate);
+      const { account } = chromeStorageService.getCurrentAccountObject();
+      if (!account) throw new Error('No account found');
+      const key: keyof ChromeStorageObject = 'accounts';
+      const update: Partial<ChromeStorageObject['accounts']> = {
+        [keysService.identityAddress]: {
+          ...account,
+          settings: {
+            ...account.settings,
+            customFeeRate: rate,
+          },
         },
-      },
-    };
-    await chromeStorageService.updateNested(key, update);
-  };
+      };
+      await chromeStorageService.updateNested(key, update);
+    },
+    [chromeStorageService, keysService.identityAddress, addSnackbar, setCustomFeeRate],
+  );
 
   const handleMasterBackup = async () => {
     await streamDataToZip(oneSatSPV, chromeStorageService, (e: MasterBackupProgressEvent) => {
@@ -420,60 +436,63 @@ export const Settings = () => {
     setMasterBackupEventText('');
   };
 
-  const handleLockWallet = async () => {
+  const handleLockWallet = useCallback(async () => {
     lockWallet();
     handleSelect('bsv');
-  };
+  }, [lockWallet, handleSelect]);
 
-  const main = (
-    <>
-      <SettingsRow
-        name="Manage Accounts"
-        description="Manage your accounts"
-        onClick={() => setPage('manage-accounts')}
-        jsxElement={<ForwardButton color={theme.color.global.contrast} />}
-      />
-      <SettingsRow
-        name="Connected Apps"
-        description="Manage the apps you are connected to"
-        onClick={() => setPage('connected-apps')}
-        jsxElement={<ForwardButton color={theme.color.global.contrast} />}
-      />
-      <SettingsRow
-        name="Preferences"
-        description="Manage your wallet preferences"
-        onClick={() => setPage('preferences')}
-        jsxElement={<ForwardButton color={theme.color.global.contrast} />}
-      />
-      <SettingsRow
-        name="Export Keys"
-        description="Download keys or export as QR code"
-        onClick={() => setPage('export-keys-options')}
-        jsxElement={<ForwardButton color={theme.color.global.contrast} />}
-      />
-      <SettingsRow name="Lock Wallet" description="Immediately lock the wallet" onClick={handleLockWallet} />
-      <Text
-        style={{
-          margin: '1rem 0',
-          textAlign: 'left',
-          color: theme.color.global.contrast,
-          fontSize: '1rem',
-          fontWeight: 700,
-        }}
-        theme={theme}
-      >
-        Danger Zone
-      </Text>
-      <SettingsRow
-        style={{
-          backgroundColor: theme.color.component.warningButton + '40',
-          border: '1px solid ' + theme.color.component.warningButton,
-        }}
-        name="Sign Out"
-        description={`Sign out of ${theme.settings.walletName} Wallet completely`}
-        onClick={handleSignOutIntent}
-      />
-    </>
+  const main = useMemo(
+    () => (
+      <>
+        <SettingsRow
+          name="Manage Accounts"
+          description="Manage your accounts"
+          onClick={() => setPage('manage-accounts')}
+          jsxElement={<ForwardButton color={theme.color.global.contrast} />}
+        />
+        <SettingsRow
+          name="Connected Apps"
+          description="Manage the apps you are connected to"
+          onClick={() => setPage('connected-apps')}
+          jsxElement={<ForwardButton color={theme.color.global.contrast} />}
+        />
+        <SettingsRow
+          name="Preferences"
+          description="Manage your wallet preferences"
+          onClick={() => setPage('preferences')}
+          jsxElement={<ForwardButton color={theme.color.global.contrast} />}
+        />
+        <SettingsRow
+          name="Export Keys"
+          description="Download keys or export as QR code"
+          onClick={() => setPage('export-keys-options')}
+          jsxElement={<ForwardButton color={theme.color.global.contrast} />}
+        />
+        <SettingsRow name="Lock Wallet" description="Immediately lock the wallet" onClick={handleLockWallet} />
+        <Text
+          style={{
+            margin: '1rem 0',
+            textAlign: 'left',
+            color: theme.color.global.contrast,
+            fontSize: '1rem',
+            fontWeight: 700,
+          }}
+          theme={theme}
+        >
+          Danger Zone
+        </Text>
+        <SettingsRow
+          style={{
+            backgroundColor: theme.color.component.warningButton + '40',
+            border: '1px solid ' + theme.color.component.warningButton,
+          }}
+          name="Sign Out"
+          description={`Sign out of ${theme.settings.walletName} Wallet completely`}
+          onClick={handleSignOutIntent}
+        />
+      </>
+    ),
+    [theme, setPage, handleLockWallet, handleSignOutIntent],
   );
 
   const manageAccountsPage = (
@@ -500,25 +519,28 @@ export const Settings = () => {
     </>
   );
 
-  const connectedAppsPage = (
-    <PageWrapper $marginTop={connectedApps.length === 0 ? '10rem' : '-1rem'}>
-      <Show when={connectedApps.length > 0} whenFalseContent={<Text theme={theme}>No apps connected</Text>}>
-        <ScrollableContainer>
-          {connectedApps.map((app, idx) => {
-            return (
-              <ConnectedAppRow key={app.domain + idx} theme={theme}>
-                <ImageAndDomain>
-                  <AppIcon src={app.icon} />
-                  <SettingsText theme={theme}>{app.domain}</SettingsText>
-                </ImageAndDomain>
-                <XIcon src={x} onClick={() => handleRemoveDomain(app.domain)} />
-              </ConnectedAppRow>
-            );
-          })}
-        </ScrollableContainer>
-      </Show>
-      <Button theme={theme} type="secondary" label={'Go back'} onClick={() => setPage('main')} />
-    </PageWrapper>
+  const connectedAppsPage = useMemo(
+    () => (
+      <PageWrapper $marginTop={connectedApps.length === 0 ? '10rem' : '-1rem'}>
+        <Show when={connectedApps.length > 0} whenFalseContent={<Text theme={theme}>No apps connected</Text>}>
+          <ScrollableContainer>
+            {connectedApps.map((app, idx) => {
+              return (
+                <ConnectedAppRow key={app.domain + idx} theme={theme}>
+                  <ImageAndDomain>
+                    <AppIcon src={app.icon} />
+                    <SettingsText theme={theme}>{app.domain}</SettingsText>
+                  </ImageAndDomain>
+                  <XIcon src={x} onClick={() => handleRemoveDomain(app.domain)} />
+                </ConnectedAppRow>
+              );
+            })}
+          </ScrollableContainer>
+        </Show>
+        <Button theme={theme} type="secondary" label={'Go back'} onClick={() => setPage('main')} />
+      </PageWrapper>
+    ),
+    [connectedApps, theme, handleRemoveDomain, setPage],
   );
 
   const exportKeysAsQrCodePage = (
@@ -617,39 +639,51 @@ export const Settings = () => {
     </>
   );
 
-  const socialProfilePage = (
-    <PageWrapper $marginTop="5rem">
-      <SettingsText theme={theme}>Display Name</SettingsText>
-      <Input
-        theme={theme}
-        placeholder="Display Name"
-        type="text"
-        onChange={(e) => setEnteredSocialDisplayName(e.target.value)}
-        value={enteredSocialDisplayName}
-      />
-      <SettingsText theme={theme}>Avatar</SettingsText>
-      <Input
-        theme={theme}
-        placeholder="Avatar Url"
-        type="text"
-        onChange={(e) => setEnteredSocialAvatar(e.target.value)}
-        value={enteredSocialAvatar}
-      />
-      <Button
-        theme={theme}
-        type="primary"
-        label="Save"
-        style={{ marginTop: '1rem' }}
-        onClick={handleSocialProfileSave}
-      />
-      <Button theme={theme} type="secondary" label={'Go back'} onClick={() => setPage('preferences')} />
-    </PageWrapper>
+  const socialProfilePage = useMemo(
+    () => (
+      <PageWrapper $marginTop="5rem">
+        <SettingsText theme={theme}>Display Name</SettingsText>
+        <Input
+          theme={theme}
+          placeholder="Display Name"
+          type="text"
+          onChange={(e) => setEnteredSocialDisplayName(e.target.value)}
+          value={enteredSocialDisplayName}
+        />
+        <SettingsText theme={theme}>Avatar</SettingsText>
+        <Input
+          theme={theme}
+          placeholder="Avatar Url"
+          type="text"
+          onChange={(e) => setEnteredSocialAvatar(e.target.value)}
+          value={enteredSocialAvatar}
+        />
+        <Button
+          theme={theme}
+          type="primary"
+          label="Save"
+          style={{ marginTop: '1rem' }}
+          onClick={handleSocialProfileSave}
+        />
+        <Button theme={theme} type="secondary" label={'Go back'} onClick={() => setPage('preferences')} />
+      </PageWrapper>
+    ),
+    [
+      theme,
+      enteredSocialDisplayName,
+      enteredSocialAvatar,
+      handleSocialProfileSave,
+      setEnteredSocialDisplayName,
+      setEnteredSocialAvatar,
+      setPage,
+    ],
   );
 
-  const accountList = (
-    <>
-      {chromeStorageService.getAllAccounts().map((account) => {
-        return (
+  const accountList = useMemo(() => {
+    const accounts = chromeStorageService.getAllAccounts();
+    return (
+      <>
+        {accounts.map((account) => (
           <AccountRow
             key={account.addresses.identityAddress}
             name={account.name}
@@ -662,11 +696,18 @@ export const Settings = () => {
               setPage('edit-account');
             }}
           />
-        );
-      })}
-      <Button theme={theme} type="secondary" label={'Go back'} onClick={() => setPage('manage-accounts')} />
-    </>
-  );
+        ))}
+        <Button theme={theme} type="secondary" label={'Go back'} onClick={() => setPage('manage-accounts')} />
+      </>
+    );
+  }, [
+    chromeStorageService,
+    theme,
+    setSelectedAccountIdentityAddress,
+    setEnteredAccountName,
+    setEnteredAccountIcon,
+    setPage,
+  ]);
 
   const editAccount = (
     <>

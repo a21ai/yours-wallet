@@ -1,4 +1,5 @@
 import { styled } from 'styled-components';
+import React from 'react';
 import { useTheme } from '../hooks/useTheme';
 import { WhiteLabelTheme } from '../theme.types';
 import { HeaderText, Text } from './Reusable';
@@ -61,7 +62,7 @@ export type AssetRowProps = {
   onClick?: () => void;
 };
 
-export const AssetRow = (props: AssetRowProps) => {
+const AssetRowComponent = (props: AssetRowProps) => {
   const { icon, ticker, balance, usdBalance, isLock, nextUnlock, onClick, showPointer, animate = false } = props;
   const { theme } = useTheme();
   const isDisplaySat = isLock && balance < 0.0001;
@@ -99,3 +100,5 @@ export const AssetRow = (props: AssetRowProps) => {
     </Container>
   );
 };
+
+export const AssetRow = React.memo(AssetRowComponent);

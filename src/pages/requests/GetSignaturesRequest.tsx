@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { GetSignatures, SignatureResponse } from 'yours-wallet-provider';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
@@ -44,6 +44,11 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
   const { bsvAddress, ordAddress, identityAddress } = keysService;
   const [satsOut, setSatsOut] = useState(0);
   const { request, onSignature, popupId } = props;
+
+  const userAddresses = useMemo(
+    () => [bsvAddress, ordAddress, identityAddress],
+    [bsvAddress, ordAddress, identityAddress],
+  );
   const [getSigsResponse, setGetSigsResponse] = useState<{
     sigResponses?: SignatureResponse[] | undefined;
     error?:
@@ -57,13 +62,11 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  useEffect(() => {
-    if (!bsvAddress || !ordAddress || !identityAddress || !oneSatSPV || !txData) return;
-    (async () => {
-      console.log(bsvAddress, ordAddress, identityAddress);
+  const calculateUserSatsOut = useCallback(
+    (txData: IndexContext) => {
       // how much did the user put in to the tx
       let userSatsOut = txData.spends.reduce((acc, spend) => {
-        if (spend.owner && [bsvAddress, ordAddress, identityAddress].includes(spend.owner)) {
+        if (spend.owner && userAddresses.includes(spend.owner)) {
           return acc + spend.satoshis;
         }
         return acc;
@@ -71,16 +74,21 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
 
       // how much did the user get back from the tx
       userSatsOut = txData.txos.reduce((acc, txo) => {
-        if (txo.owner && [bsvAddress, ordAddress, identityAddress].includes(txo.owner)) {
+        if (txo.owner && userAddresses.includes(txo.owner)) {
           return acc - txo.satoshis;
         }
         return acc;
       }, userSatsOut);
 
-      setSatsOut(Number(userSatsOut));
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [txData]);
+      return Number(userSatsOut);
+    },
+    [userAddresses],
+  );
+
+  useEffect(() => {
+    if (!oneSatSPV || !txData) return;
+    setSatsOut(calculateUserSatsOut(txData));
+  }, [txData, calculateUserSatsOut, oneSatSPV]);
 
   useEffect(() => {
     (async () => {
@@ -98,11 +106,11 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
     hideMenu();
   }, [handleSelect, hideMenu]);
 
-  const resetSendState = () => {
+  const resetSendState = useCallback(() => {
     setPasswordConfirm('');
     setGetSigsResponse(undefined);
     setIsProcessing(false);
-  };
+  }, []);
 
   useEffect(() => {
     if (!getSigsResponse) return;
@@ -112,46 +120,51 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [message, getSigsResponse]);
 
-  const handleSigning = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setIsProcessing(true);
-    await sleep(25);
+  const handleSigning = useCallback(
+    async (e: React.FormEvent<HTMLFormElement>) => {
+      e.preventDefault();
+      setIsProcessing(true);
+      await sleep(25);
 
-    if (!passwordConfirm && isPasswordRequired) {
-      addSnackbar('You must enter a password!', 'error', 3000);
-      setIsProcessing(false);
-      return;
-    }
+      if (!passwordConfirm && isPasswordRequired) {
+        addSnackbar('You must enter a password!', 'error', 3000);
+        setIsProcessing(false);
+        return;
+      }
 
-    const getSigsRes = await contractService.getSignatures(request, passwordConfirm);
+      const getSigsRes = await contractService.getSignatures(request, passwordConfirm);
 
-    if (getSigsRes?.error) {
+      if (getSigsRes?.error) {
+        sendMessage({
+          action: 'getSignaturesResponse',
+          ...getSigsRes,
+        });
+
+        addSnackbar(getErrorMessage(getSigsRes.error.message), 'error', 3000);
+        setIsProcessing(false);
+        return;
+      }
+
+      setGetSigsResponse(getSigsRes);
       sendMessage({
         action: 'getSignaturesResponse',
         ...getSigsRes,
       });
 
-      addSnackbar(getErrorMessage(getSigsRes.error.message), 'error', 3000);
-      setIsProcessing(false);
-      return;
-    }
+      addSnackbar('Successfully Signed!', 'success');
+      await sleep(2000);
+      onSignature();
+    },
+    [passwordConfirm, isPasswordRequired, contractService, request, addSnackbar, onSignature],
+  );
 
-    setGetSigsResponse(getSigsRes);
-    sendMessage({
-      action: 'getSignaturesResponse',
-      ...getSigsRes,
-    });
-
-    addSnackbar('Successfully Signed!', 'success');
-    await sleep(2000);
-    onSignature();
-  };
-
-  const clearRequest = async () => {
+  const clearRequest = useCallback(async () => {
     await chromeStorageService.remove('getSignaturesRequest');
     if (popupId) removeWindow(popupId);
     window.location.reload();
-  };
+  }, [chromeStorageService, popupId]);
+
+  const inputsToSignMemo = useMemo(() => request.sigRequests.map((r) => r.inputIndex), [request.sigRequests]);
 
   return (
     <>
@@ -165,7 +178,7 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
             The app is requesting signatures for a transaction.
           </Text>
           <FormContainer noValidate onSubmit={(e) => handleSigning(e)}>
-            {txData && <TxPreview txData={txData} inputsToSign={request.sigRequests.map((r) => r.inputIndex)} />}
+            {txData && <TxPreview txData={txData} inputsToSign={inputsToSignMemo} />}
             <Show when={isPasswordRequired}>
               <Input
                 theme={theme}
