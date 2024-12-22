@@ -21,6 +21,19 @@ Yours Wallet is an open-source and non-custodial web3 SPV wallet for Bitcoin SV 
 
 ## Development
 
+#### Performance Profiling 🔍
+
+For development and performance analysis:
+1. Install [React Scan](https://react-scan.com)
+   - Available as a Chrome extension
+   - No code changes required - just drop it in
+   - Available via Chrome DevTools after installation
+2. Usage
+   - Open Chrome DevTools
+   - Navigate to the React Scan tab
+   - Automatically detects and profiles React components
+   - Identifies performance bottlenecks and unnecessary re-renders
+
 #### Wallet Provider API 🚀
 
 Documentation on integrating Yours Wallet into your decentralized web3 application can be [found here](https://panda-wallet.gitbook.io/provider-api/).
