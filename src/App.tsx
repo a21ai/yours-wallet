@@ -16,6 +16,7 @@ import { ImportAccount } from './pages/onboarding/ImportAccount';
 import { RestoreAccount } from './pages/onboarding/RestoreAccount';
 import { Start } from './pages/onboarding/Start';
 import { OrdWallet } from './pages/OrdWallet';
+import { Inscriptions } from './pages/Inscriptions';
 import { BroadcastRequest } from './pages/requests/BroadcastRequest';
 import { BsvSendRequest } from './pages/requests/BsvSendRequest';
 import { ConnectRequest } from './pages/requests/ConnectRequest';
@@ -254,6 +255,7 @@ export const App = () => {
                           </Show>
                         }
                       />
+                      <Route path="/inscriptions" element={<Inscriptions />} />
                       <Route path="/tools" element={<AppsAndTools />} />
                       <Route path="/settings" element={<Settings />} />
                     </Routes>
