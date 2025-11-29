@@ -149,6 +149,17 @@ if (isInServiceWorker) {
     await chromeStorageService.getAndSetStorage();
     oneSatSPVPromise = initOneSatSPV(chromeStorageService, isInServiceWorker);
     initNewTxsListener();
+    
+    // Emit accountsChanged event with new account addresses
+    const { account } = chromeStorageService.getCurrentAccountObject();
+    if (account?.addresses) {
+      emitEventToActiveTabs({
+        action: YoursEventName.ACCOUNTS_CHANGED,
+        params: {
+          data: account.addresses,
+        },
+      });
+    }
   };
 
   const launchPopUp = () => {
@@ -195,7 +206,7 @@ if (isInServiceWorker) {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   chrome.runtime.onMessage.addListener((message: any, sender, sendResponse: CallbackResponse) => {
-    if ([YoursEventName.SIGNED_OUT, YoursEventName.SWITCH_ACCOUNT].includes(message.action)) {
+    if ([YoursEventName.SIGNED_OUT, YoursEventName.SWITCH_ACCOUNT, YoursEventName.ACCOUNTS_CHANGED].includes(message.action)) {
       emitEventToActiveTabs(message);
     }
 
@@ -215,6 +226,7 @@ if (isInServiceWorker) {
       YoursEventName.DECRYPT_RESPONSE,
       YoursEventName.SYNC_UTXOS,
       YoursEventName.SWITCH_ACCOUNT,
+      YoursEventName.ACCOUNTS_CHANGED,
       YoursEventName.SIGNED_OUT,
     ];
 

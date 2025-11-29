@@ -65,6 +65,7 @@ export enum YoursEventName {
   ENCRYPT = 'encryptRequest',
   DECRYPT = 'decryptRequest',
   SIGNED_OUT = 'signedOut',
+  ACCOUNTS_CHANGED = 'accountsChanged',
   USER_CONNECT_RESPONSE = 'userConnectResponse',
   SEND_BSV_RESPONSE = 'sendBsvResponse',
   SEND_BSV20_RESPONSE = 'sendBsv20Response',
@@ -108,7 +109,8 @@ export type RequestParams = {
     | GetSignatures
     | TaggedDerivationRequest
     | EncryptRequest
-    | DecryptRequest;
+    | DecryptRequest
+    | Addresses;
   domain?: string;
   isAuthorized?: boolean;
 };
@@ -208,7 +210,7 @@ const createYoursMethod = <T, P = RequestParams>(type: YoursEventName) => {
   };
 };
 
-const whitelistedEvents: string[] = [YoursEventName.SIGNED_OUT, YoursEventName.SWITCH_ACCOUNT]; // Whitelisted event names
+const whitelistedEvents: string[] = [YoursEventName.SIGNED_OUT, YoursEventName.SWITCH_ACCOUNT, YoursEventName.ACCOUNTS_CHANGED]; // Whitelisted event names
 
 const createYoursEventEmitter = () => {
   const eventListeners = new Map<string, YoursEventListeners[]>(); // Object to store event listeners
