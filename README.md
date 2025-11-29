@@ -18,6 +18,7 @@ Yours Wallet is an open-source and non-custodial web3 SPV wallet for Bitcoin SV 
 - ✅ **BSV Support:** Receive and Send BSV payments.
 - 🟡 **1Sat Ordinals:** Full support for sending and transferring 1Sat Ordinals.
 - 🔐 **Secure:** Open Source and audited by the community.
+- 🔔 **Account Change Listener:** Listen for account switches in your web3 dApps with the `accountsChanged` event.
 
 ## Development
 
@@ -26,6 +27,8 @@ Yours Wallet is an open-source and non-custodial web3 SPV wallet for Bitcoin SV 
 Documentation on integrating Yours Wallet into your decentralized web3 application can be [found here](https://panda-wallet.gitbook.io/provider-api/).
 
 You can also check out the live sample app: [View Sample App](https://panda-wallet-sample-app.vercel.app/)
+
+**New Feature:** Account Change Listener - See [ACCOUNTS_CHANGED_EVENT.md](ACCOUNTS_CHANGED_EVENT.md) for detailed documentation on listening to account changes in your dApp.
 
 #### Contributing 🙌
 
